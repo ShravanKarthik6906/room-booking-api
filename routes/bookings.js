@@ -87,4 +87,58 @@ router.post('/book', requireAuth, async (req, res) => {
   res.status(201).json(booking);
 });
 
+// GET /api/bookings/me — my bookings, upcoming first (soonest at the top),
+// then past bookings (most recent first)
+router.get('/bookings/me', requireAuth, async (req, res) => {
+  const { data, error } = await req.supabase
+    .from('bookings')
+    .select('id, room_id, start_time, end_time, status, created_at, room:rooms(name, building)')
+    .eq('user_id', req.user.id)
+    .order('start_time', { ascending: true });
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  const now = new Date();
+  const upcoming = data.filter((b) => new Date(b.end_time) >= now);
+  const past = data.filter((b) => new Date(b.end_time) < now).reverse();
+
+  res.json([...upcoming, ...past]);
+});
+
+// PATCH /api/bookings/:id/cancel — only the person who made the booking
+router.patch('/bookings/:id/cancel', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  if (!/^\d+$/.test(id) || Number(id) > Number.MAX_SAFE_INTEGER) {
+    return res.status(400).json({ error: 'Booking id must be a positive whole number' });
+  }
+
+  const db = req.supabase;
+
+  const { data: booking, error: findError } = await db
+    .from('bookings')
+    .select('id, user_id, status')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (findError) return res.status(500).json({ error: findError.message });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  if (booking.user_id !== req.user.id) {
+    return res.status(403).json({ error: 'You can only cancel your own bookings' });
+  }
+  if (booking.status === 'cancelled') {
+    return res.status(400).json({ error: 'Booking is already cancelled' });
+  }
+
+  const { data: updated, error: updateError } = await db
+    .from('bookings')
+    .update({ status: 'cancelled' })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (updateError) return res.status(500).json({ error: updateError.message });
+
+  res.json(updated);
+});
+
 module.exports = router;

@@ -9,6 +9,7 @@ app.use(express.json());
 app.use('/api/health', require('./routes/health'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/spaces', require('./routes/rooms'));
+app.use('/api', require('./routes/bookings'));
 
 app.get('/', (req, res) => {
   res.json({ message: 'On-Campus Room Booking API. See /api/health' });

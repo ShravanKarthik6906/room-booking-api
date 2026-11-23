@@ -6,6 +6,8 @@ const app = express();
 app.use(express.json());
 
 // ----- Routes -----
+app.use('/api/health', require('./routes/health'));
+
 app.get('/', (req, res) => {
   res.json({ message: 'On-Campus Room Booking API. See /api/health' });
 });
